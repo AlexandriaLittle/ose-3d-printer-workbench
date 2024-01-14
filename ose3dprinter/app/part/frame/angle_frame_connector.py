@@ -45,11 +45,17 @@ class AngleFrameConnector:
         :type with_filleting: bool
         :rtype: Part.Shape
         """
-        bracket_length = cls.calculate_bracket_length(width, thickness)
+        
+        wall_thickness = 4
+        
+        bracket_length = cls.calculate_bracket_length(width, wall_thickness)
         length = bracket_length + width
+        
+
 
         angle_frame_connector = cls._make_angle_frame_connector(width,
                                                                 thickness,
+                                                                wall_thickness,
                                                                 bracket_length,
                                                                 length,
                                                                 corner,
@@ -65,12 +71,13 @@ class AngleFrameConnector:
     def _make_angle_frame_connector(cls,
                                     width,
                                     thickness,
+                                    wall_thickness,
                                     bracket_length,
                                     length,
                                     corner,
                                     with_set_screw,
                                     with_filleting):
-        bracket_width = cls.calculate_bracket_width(thickness)
+        bracket_width = cls.calculate_bracket_width(thickness, wall_thickness)
 
         angle_connector_corner = make_angle_connector_corner(
             bracket_length, bracket_width)
@@ -79,6 +86,7 @@ class AngleFrameConnector:
             bracket_length,
             width,
             thickness,
+            wall_thickness,
             with_set_screw,
             with_filleting)
 
@@ -117,12 +125,12 @@ class AngleFrameConnector:
         return angle_frame_connector.removeSplitter()
 
     @classmethod
-    def calculate_bracket_length(cls, width, thickness):
-        return width + (thickness * 2)
+    def calculate_bracket_length(cls, width, wall_thickness):
+        return width + (wall_thickness * 2)
 
     @classmethod
-    def calculate_bracket_width(cls, thickness):
-        return thickness * 3
+    def calculate_bracket_width(cls, thickness, wall_thickness):
+        return thickness + (2 * wall_thickness)
 
     @classmethod
     def distance_between_axis_side_mount_holes_and_frame(cls):
@@ -138,6 +146,7 @@ class AngleFrameConnector:
 def make_tri_bracket(width,
                      height,
                      thickness,
+                     wall_thickness,
                      with_set_screw=False,
                      with_filleting=False):
     """Make tri-bracket.
@@ -155,14 +164,16 @@ def make_tri_bracket(width,
     :param with_filleting: Whether to include filleting.
     :type with_filleting: bool
     """
-    set_screw_block_width = 20
+    set_screw_block_width = 10
+    
 
     outer_vectors = get_outer_points(width,
                                      thickness,
+                                     wall_thickness,
                                      set_screw_block_width,
                                      with_set_screw)
 
-    inner_vectors = get_inner_points(width, thickness)
+    inner_vectors = get_inner_points(width, thickness, wall_thickness)
 
     face = make_face_from_vectors(outer_vectors, inner_vectors)
 
@@ -173,6 +184,7 @@ def make_tri_bracket(width,
                                   width,
                                   height,
                                   thickness,
+                                  wall_thickness,
                                   set_screw_block_width)
 
     if with_filleting:
@@ -208,9 +220,10 @@ def is_wire_parallel_to_xy_plane(wire):
 
 def get_outer_points(width,
                      thickness,
+                     wall_thickness,
                      set_screw_block_width,
                      with_set_screw):
-    side = thickness * 3
+    side = thickness + (2 * wall_thickness)
     bottom_left = Vector(0, 0, 0)
     top_left = Vector(0, width, 0)
     top_left_mid = Vector(side, width, 0)
@@ -240,15 +253,15 @@ def get_outer_points(width,
     return outer_points
 
 
-def get_inner_points(width, thickness):
-    length = width - thickness
-    side = thickness * 2
-    bottom_left_inner = Vector(thickness, thickness, 0)
-    top_left_inner = Vector(thickness, length, 0)
+def get_inner_points(width, thickness, wall_thickness):
+    length = width - wall_thickness
+    side = thickness + wall_thickness
+    bottom_left_inner = Vector(wall_thickness, wall_thickness, 0)
+    top_left_inner = Vector(wall_thickness, length, 0)
     top_left_mid_inner = Vector(side, length, 0)
     mid_inner = Vector(side, side, 0)
     top_right_mid_inner = Vector(length, side, 0)
-    bottom_right_inner = Vector(length, thickness, 0)
+    bottom_right_inner = Vector(length, wall_thickness, 0)
 
     return [
         bottom_left_inner,
@@ -264,6 +277,7 @@ def cut_screw_screw(bracket,
                     width,
                     height,
                     thickness,
+                    wall_thickness,
                     set_screw_block_width):
     # M6 Hex Socket Set Screw specifications:
     # https://www.bolts-library.org/en/parts/names/HexSocketSetScrew.html
@@ -285,16 +299,17 @@ def cut_screw_screw(bracket,
     set_screw_cutout = make_set_screw_cutout(
         set_screw_cutout_length, nut_height, set_screw_cutout_height)
     z = height - set_screw_cutout_height
-    set_screw_cutout.translate(Vector(thickness * 2, thickness * 2, z))
+    set_screw_cutout.translate(Vector(thickness + wall_thickness, thickness + wall_thickness, z))
     bracket = bracket.cut(set_screw_cutout)
 
     cylinder = make_cylinder(screw_radius, set_screw_block_width)
     bracket_with_hole = cut_set_screw_hole(
-        bracket, height, thickness, cylinder)
+        bracket, height, thickness, wall_thickness, cylinder)
 
     ramp_height = height - set_screw_cutout_height
     bracket = fuse_nut_ramps_to_bracket(bracket_with_hole,
                                         thickness,
+                                        wall_thickness,
                                         set_screw_cutout_length,
                                         nut_height,
                                         ramp_height)
@@ -330,8 +345,9 @@ def make_set_screw_cutout(length, nut_height, height):
 def cut_set_screw_hole(bracket,
                        height,
                        thickness,
+                       wall_thickness,
                        cylinder):
-    translation = thickness * 3
+    translation = thickness + (2 * wall_thickness)
     z = height / 2.0
     cylinder.translate(Vector(translation, translation, z))
     return bracket.cut(cylinder)
@@ -349,6 +365,7 @@ def make_cylinder(radius, height):
 
 def fuse_nut_ramps_to_bracket(bracket,
                               thickness,
+                              wall_thickness,
                               set_screw_cutout_length,
                               set_screw_cutout_width,
                               ramp_height):
@@ -389,14 +406,14 @@ def fuse_nut_ramps_to_bracket(bracket,
 
     cutout_length_offset = set_screw_cutout_length * cos(radians(rotation))
     left_ramp.translate(Vector(
-        thickness * 2,
-        (thickness * 2) + cutout_length_offset,
+        thickness + wall_thickness,
+        (thickness + wall_thickness) + cutout_length_offset,
         ramp_height))
 
     cutout_width_offset = set_screw_cutout_width * cos(radians(rotation))
     right_ramp.translate(Vector(
-        (thickness * 2) + cutout_length_offset + cutout_width_offset,
-        (thickness * 2) + cutout_width_offset,
+        (thickness + wall_thickness) + cutout_length_offset + cutout_width_offset,
+        (thickness + wall_thickness) + cutout_width_offset,
         ramp_height))
 
     bracket = bracket.fuse(left_ramp)
